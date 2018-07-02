@@ -97,13 +97,14 @@ CloudFormation do
           end
           listener_conditions << { Field: "host-header", Values: hosts }
         end
-      end
 
-      ElasticLoadBalancingV2_ListenerRule("#{tg_name}Rule") do
-        Actions [{ Type: "forward", TargetGroupArn: Ref("#{tg_name}TargetGroup") }]
-        Conditions listener_conditions
-        ListenerArn Ref("#{tg['listener']}Listener")
-        Priority tg['priority'].to_i
+        ElasticLoadBalancingV2_ListenerRule("#{tg_name}Rule") do
+          Actions [{ Type: "forward", TargetGroupArn: Ref("#{tg_name}TargetGroup") }]
+          Conditions listener_conditions
+          ListenerArn Ref("#{tg['listener']}Listener")
+          Priority tg['priority'].to_i
+        end
+        
       end
     end
 
