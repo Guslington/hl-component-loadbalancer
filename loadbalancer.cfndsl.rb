@@ -97,6 +97,33 @@ CloudFormation do
     Output("#{listener_name}Listener") { Value(Ref("#{listener_name}Listener")) }
   end if defined?('listeners')
 
+  conditions.each_with_index do |condition,offset|
+
+    listener_conditions = []
+    if condition.key?("path")
+      listener_conditions << { Field: "path-pattern", Values: [ condition["path"] ] }
+    end
+    if condition.key?("host")
+      hosts = []
+      if condition["host"].include?('.')
+        hosts << condition["host"]
+      else
+        hosts << FnJoin("", [ condition["host"], ".", Ref("EnvironmentName"), ".", Ref('DnsDomain') ])
+      end
+      listener_conditions << { Field: "host-header", Values: hosts }
+    end
+
+    rule_name = "#{condition['name'].capitalize}#{condition['listener'].capitalize}#{offset if offset > 0}ListenerRule"
+
+    ElasticLoadBalancingV2_ListenerRule(rule_name) do
+      Actions [{ Type: "forward", TargetGroupArn: Ref("#{condition['targetgroup']}") }]
+      Conditions listener_conditions
+      ListenerArn Ref("LoadBalancer#{condition['listener']}Listener")
+      Priority (condition['priority'].to_i + index + offset)
+    end
+
+  end if defined?('conditions')
+
   if defined? records
     records.each do |record|
       Route53_RecordSet("#{record.gsub('*','Wildcard')}LoadBalancerRecord") do
@@ -108,7 +135,7 @@ CloudFormation do
           HostedZoneId: FnGetAtt("LoadBalancer","CanonicalHostedZoneID")
         })
       end
-    end 
+    end
   end
 
   Output('LoadBalancer', Ref('LoadBalancer'))
