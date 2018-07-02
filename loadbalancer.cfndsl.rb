@@ -81,6 +81,34 @@ CloudFormation do
     end
 
     Output("#{tg_name}TargetGroup", Ref("#{tg_name}TargetGroup"))
+
+    if tg.has_key?('rules')
+      listener_conditions = []
+      tg['rules'].each do |rule|
+        if rule.key?("path")
+          listener_conditions << { Field: "path-pattern", Values: [ condition["path"] ] }
+        end
+        if rule.key?("host")
+          hosts = []
+          if rule["host"].include?('.')
+            hosts << condition["host"]
+          else
+            hosts << FnJoin("", [ rule["host"], ".", Ref("EnvironmentName"), ".", Ref('DnsDomain') ])
+          end
+          listener_conditions << { Field: "host-header", Values: hosts }
+        end
+      end
+
+      rule_name = "#{condition['name'].capitalize}#{condition['listener'].capitalize}#{offset if offset > 0}ListenerRule"
+
+      ElasticLoadBalancingV2_ListenerRule(rule_name) do
+        Actions [{ Type: "forward", TargetGroupArn: Ref("#{tg_name}TargetGroup") }]
+        Conditions listener_conditions
+        ListenerArn Ref("LoadBalancer#{tg['listener']}Listener")
+        Priority tg['priority'].to_i
+      end
+    end
+
   end if defined?('targetgroups')
 
   listeners.each do |listener_name, listener|
@@ -96,33 +124,6 @@ CloudFormation do
     end
     Output("#{listener_name}Listener") { Value(Ref("#{listener_name}Listener")) }
   end if defined?('listeners')
-
-  conditions.each_with_index do |condition,offset|
-
-    listener_conditions = []
-    if condition.key?("path")
-      listener_conditions << { Field: "path-pattern", Values: [ condition["path"] ] }
-    end
-    if condition.key?("host")
-      hosts = []
-      if condition["host"].include?('.')
-        hosts << condition["host"]
-      else
-        hosts << FnJoin("", [ condition["host"], ".", Ref("EnvironmentName"), ".", Ref('DnsDomain') ])
-      end
-      listener_conditions << { Field: "host-header", Values: hosts }
-    end
-
-    rule_name = "#{condition['name'].capitalize}#{condition['listener'].capitalize}#{offset if offset > 0}ListenerRule"
-
-    ElasticLoadBalancingV2_ListenerRule(rule_name) do
-      Actions [{ Type: "forward", TargetGroupArn: Ref("#{condition['targetgroup']}") }]
-      Conditions listener_conditions
-      ListenerArn Ref("LoadBalancer#{condition['listener']}Listener")
-      Priority (condition['priority'].to_i + index + offset)
-    end
-
-  end if defined?('conditions')
 
   if defined? records
     records.each do |record|
