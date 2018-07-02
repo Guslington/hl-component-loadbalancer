@@ -99,9 +99,7 @@ CloudFormation do
         end
       end
 
-      rule_name = "#{condition['name'].capitalize}#{condition['listener'].capitalize}#{offset if offset > 0}ListenerRule"
-
-      ElasticLoadBalancingV2_ListenerRule(rule_name) do
+      ElasticLoadBalancingV2_ListenerRule("#{tg_name}Rule") do
         Actions [{ Type: "forward", TargetGroupArn: Ref("#{tg_name}TargetGroup") }]
         Conditions listener_conditions
         ListenerArn Ref("LoadBalancer#{tg['listener']}Listener")
